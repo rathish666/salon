@@ -108,3 +108,4 @@ body is Work Sans. `prefers-reduced-motion` is respected globally in
 `index.css`.
 # salon
 # salon
+# salon
