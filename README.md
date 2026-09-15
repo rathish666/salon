@@ -107,3 +107,4 @@ ink (#1B1815), parchment (#F7F2EA), champagne (#C9A66B) and rosewood
 body is Work Sans. `prefers-reduced-motion` is respected globally in
 `index.css`.
 # salon
+# salon
