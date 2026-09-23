@@ -85,46 +85,27 @@ export interface BookingPayload {
 }
 
 export async function submitBooking(payload: BookingPayload): Promise<{ error: string | null }> {
-  // Find or create the customer by phone (unique key).
-  const { data: existingCustomer } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('phone', payload.customer.phone)
-    .maybeSingle();
-
-  let customerId = existingCustomer?.id as string | undefined;
-
-  if (!customerId) {
-    const { data: newCustomer, error: customerError } = await supabase
-      .from('customers')
-      .insert({
-        full_name: payload.customer.fullName,
-        phone: payload.customer.phone,
-        email: payload.customer.email || null,
-      })
-      .select('id')
-      .single();
-    if (customerError) return { error: 'Could not save your details. Please check them and try again.' };
-    customerId = newCustomer.id;
-  }
-
-  const { error: apptError } = await supabase.from('appointments').insert({
-    customer_id: customerId,
-    service_id: payload.serviceId,
-    staff_id: payload.staffId,
-    appointment_date: payload.date,
-    start_time: payload.startTime,
-    end_time: payload.endTime,
-    status: 'pending',
-    notes: payload.notes || null,
+  // Customer rows are private under RLS, so this runs the lookup/create and
+  // appointment insert together in a database function instead of requesting
+  // the new customer's id from the browser.
+  const { error: bookingError } = await supabase.rpc('create_public_booking', {
+    p_service_id: payload.serviceId,
+    p_staff_id: payload.staffId,
+    p_appointment_date: payload.date,
+    p_start_time: payload.startTime,
+    p_end_time: payload.endTime,
+    p_full_name: payload.customer.fullName,
+    p_phone: payload.customer.phone,
+    p_email: payload.customer.email || null,
+    p_notes: payload.notes || null,
   });
 
-  if (apptError) {
+  if (bookingError) {
     // Postgres exclusion-constraint violations surface as code 23P01.
-    if ((apptError as { code?: string }).code === '23P01') {
+    if ((bookingError as { code?: string }).code === '23P01') {
       return { error: 'That time was just booked by someone else. Please pick another slot.' };
     }
-    return { error: 'Something went wrong while booking your appointment. Please try again.' };
+    return { error: 'Could not save your details. Please check them and try again.' };
   }
 
   return { error: null };
